@@ -105,6 +105,23 @@ impl LockTime {
     #[inline]
     pub const fn from_height(n: u16) -> Self { LockTime::Blocks(Height::from_height(n)) }
 
+    /// Try to interpret the given number as a relative lock time.
+    #[inline]
+    pub fn from_num(num: i64) -> Option<LockTime> {
+        let int = u32::try_from(num).ok()?;
+
+        if int & Sequence::LOCK_TIME_DISABLE_FLAG_MASK != 0 {
+            return None;
+        }
+
+        let low16 = int as u16; // only need lowest 16 bits
+        if int & Sequence::LOCK_TYPE_MASK > 0 {
+            Some(LockTime::from(Time::from_512_second_intervals(low16)))
+        } else {
+            Some(LockTime::from(Height::from(low16)))
+        }
+    }
+
     /// Constructs a new `LockTime` from `n`, expecting `n` to be a count of 512-second intervals.
     ///
     /// This function is a little awkward to use, and users may wish to instead use
