@@ -47,6 +47,7 @@
 //! At the time of writing there's only one operation using the cache - `push_verify`, so the cache
 //! is minimal but we may extend it in the future if needed.
 
+mod asm;
 mod borrowed;
 mod builder;
 mod instruction;
@@ -79,6 +80,7 @@ pub use self::{
     instruction::{Instruction, Instructions, InstructionIndices},
     owned::ScriptBufExt,
     push_bytes::{PushBytes, PushBytesBuf, PushBytesError, PushBytesErrorReport},
+    asm::{ParseAsmError, ParseAsmErrorKind}
 };
 #[doc(inline)]
 pub use primitives::script::*;
