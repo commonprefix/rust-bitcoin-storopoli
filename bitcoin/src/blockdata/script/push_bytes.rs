@@ -42,7 +42,7 @@ mod primitive {
     /// the script safely.
     #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
     #[repr(transparent)]
-    pub struct PushBytes([u8]);
+    pub struct PushBytes(pub(super) [u8]);
 
     impl PushBytes {
         /// Constructs a new `&PushBytes` without checking the length.
@@ -310,30 +310,7 @@ impl PushBytes {
     ///
     /// This code is based on the `CScriptNum` constructor in Bitcoin Core (see `script.h`).
     pub fn read_scriptint(&self) -> Result<i64, script::Error> {
-        let last = match self.as_bytes().last() {
-            Some(last) => last,
-            None => return Ok(0),
-        };
-        if self.len() > 4 {
-            return Err(script::Error::NumericOverflow);
-        }
-        // Comment and code copied from Bitcoin Core:
-        // https://github.com/bitcoin/bitcoin/blob/447f50e4aed9a8b1d80e1891cda85801aeb80b4e/src/script/script.h#L247-L262
-        // If the most-significant-byte - excluding the sign bit - is zero
-        // then we're not minimal. Note how this test also rejects the
-        // negative-zero encoding, 0x80.
-        if (*last & 0x7f) == 0 {
-            // One exception: if there's more than one byte and the most
-            // significant bit of the second-most-significant-byte is set
-            // it would conflict with the sign bit. An example of this case
-            // is +-255, which encode to 0xff00 and 0xff80 respectively.
-            // (big-endian).
-            if self.len() <= 1 || (self[self.len() - 2] & 0x80) == 0 {
-                return Err(script::Error::NonMinimalPush);
-            }
-        }
-
-        Ok(script::scriptint_parse(self.as_bytes()))
+        script::read_scriptint_size(self.0.as_ref(), script::DEFAULT_MAX_SCRIPTINT_SIZE, true)
     }
 }
 
