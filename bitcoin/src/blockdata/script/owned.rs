@@ -6,7 +6,11 @@ use core::ops::Deref;
 use hex::FromHex;
 use internals::ToU64 as _;
 
-use super::{opcode_to_verify, Builder, Instruction, PushBytes, ScriptExtPriv as _};
+use super::asm::{asm_err, iter_words, try_parse_raw_hex};
+use super::{
+    opcode_to_verify, Builder, Instruction, ParseAsmError, ParseAsmErrorKind, PushBytes,
+    ScriptExtPriv as _,
+};
 use crate::opcodes::all::*;
 use crate::opcodes::{self, Opcode};
 use crate::prelude::Vec;
@@ -78,6 +82,86 @@ crate::internal_macros::define_extension_trait! {
         /// `Builder` if you're creating the script from scratch or if you want to push `OP_VERIFY`
         /// multiple times.
         fn scan_and_push_verify(&mut self) { self.push_verify(self.last_opcode()); }
+
+        /// Parse a Script in ASM format.
+        fn parse_asm(asm: &str) -> Result<ScriptBuf, ParseAsmError> {
+            let mut buf = Vec::with_capacity(65);
+            let mut builder = Builder::new();
+            let mut words = iter_words(asm);
+            while let Some((pos, mut word)) = words.next() {
+                // We have this special case in our formatter.
+                if word == "OP_0" {
+                    builder = builder.push_opcode(OP_PUSHBYTES_0);
+                    continue;
+                }
+
+                if let Ok(op) = word.parse::<Opcode>() {
+                    // check for push opcodes
+                    if op.code <= OP_PUSHDATA4.code {
+                        let (next, push) =
+                            words.next().ok_or(asm_err(pos, ParseAsmErrorKind::UnexpectedEof))?;
+                        if !try_parse_raw_hex(push, &mut buf) {
+                            return Err(asm_err(next, ParseAsmErrorKind::InvalidHex));
+                        }
+
+                        // NB our API doesn't actually allow us to make byte pushes with
+                        // non-minimal length prefix, so we can only check and error if
+                        // the user wants a non-minimal push
+                        let expected_push_op = match buf.len() {
+                            n if n < OP_PUSHDATA1.code as usize => Opcode::from(n as u8),
+                            n if n < 0x100 => OP_PUSHDATA1,
+                            n if n < 0x10000 => OP_PUSHDATA2,
+                            // NB: in 32-bit target archs, we can't have sizes larger than u32::MAX
+                            #[cfg(any(target_pointer_width = "16", target_pointer_width = "32"))]
+                            _ => OP_PUSHDATA4,
+                            #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
+                            n if n < 0x100000000 => OP_PUSHDATA4,
+                            #[cfg(not(any(target_pointer_width = "16", target_pointer_width = "32")))]
+                            _ => return Err(asm_err(next, ParseAsmErrorKind::PushExceedsMaxSize)),
+                        };
+                        if op != expected_push_op {
+                            return Err(asm_err(pos, ParseAsmErrorKind::NonMinimalBytePush));
+                        }
+
+                        let push = <&PushBytes>::try_from(&buf[..])
+                            .map_err(|_| asm_err(next, ParseAsmErrorKind::PushExceedsMaxSize))?;
+                        builder = builder.push_slice(push);
+                    } else {
+                        builder = builder.push_opcode(op);
+                    }
+                    continue;
+                }
+
+                // Not an opcode, try to interpret as number or push.
+
+                if word.starts_with('<') && word.ends_with('>') {
+                    word = &word[1..word.len() - 1];
+                }
+
+                // Try a number.
+                if let Ok(i) = &word.parse::<i32>() {
+                    builder = builder
+                        .push_int(*i)
+                        .map_err(|_| asm_err(pos, ParseAsmErrorKind::PushExceedsMaxSize))?;
+                    continue;
+                }
+
+                // Finally, try hex in various forms.
+                if word.starts_with("0x") {
+                    word = &word[2..];
+                }
+
+                if try_parse_raw_hex(word, &mut buf) {
+                    let push = <&PushBytes>::try_from(&buf[..])
+                        .map_err(|_| asm_err(pos, ParseAsmErrorKind::PushExceedsMaxSize))?;
+                    builder = builder.push_slice(push);
+                } else {
+                    return Err(asm_err(pos, ParseAsmErrorKind::UnknownInstruction));
+                }
+            }
+
+            Ok(builder.into_script())
+        }
     }
 }
 
