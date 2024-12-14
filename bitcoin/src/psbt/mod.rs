@@ -168,7 +168,9 @@ impl Psbt {
     /// This can result in a transaction with absurdly high fees. Use with caution.
     ///
     /// [`extract_tx_fee_rate_limit`]: Psbt::extract_tx_fee_rate_limit
-    pub fn extract_tx_unchecked_fee_rate(self) -> Transaction { self.internal_extract_tx() }
+    pub fn extract_tx_unchecked_fee_rate(self) -> Transaction {
+        self.internal_extract_tx()
+    }
 
     #[inline]
     fn internal_extract_tx(self) -> Transaction {
@@ -189,14 +191,16 @@ impl Psbt {
     ) -> Result<Transaction, ExtractTxError> {
         let fee = match self.fee() {
             Ok(fee) => fee,
-            Err(Error::MissingUtxo) =>
-                return Err(ExtractTxError::MissingInputValue { tx: self.internal_extract_tx() }),
+            Err(Error::MissingUtxo) => {
+                return Err(ExtractTxError::MissingInputValue { tx: self.internal_extract_tx() })
+            }
             Err(Error::NegativeFee) => return Err(ExtractTxError::SendingTooMuch { psbt: self }),
-            Err(Error::FeeOverflow) =>
+            Err(Error::FeeOverflow) => {
                 return Err(ExtractTxError::AbsurdFeeRate {
                     fee_rate: FeeRate::MAX,
                     tx: self.internal_extract_tx(),
-                }),
+                })
+            }
             _ => unreachable!(),
         };
 
@@ -308,7 +312,7 @@ impl Psbt {
 
         for i in 0..self.inputs.len() {
             match self.signing_algorithm(i) {
-                Ok(SigningAlgorithm::Ecdsa) =>
+                Ok(SigningAlgorithm::Ecdsa) => {
                     match self.bip32_sign_ecdsa(k, i, &mut cache, secp) {
                         Ok(v) => {
                             used.insert(i, SigningKeys::Ecdsa(v));
@@ -316,7 +320,8 @@ impl Psbt {
                         Err(e) => {
                             errors.insert(i, e);
                         }
-                    },
+                    }
+                }
                 Ok(SigningAlgorithm::Schnorr) => {
                     match self.bip32_sign_schnorr(k, i, &mut cache, secp) {
                         Ok(v) => {
@@ -446,7 +451,7 @@ impl Psbt {
                     #[cfg(feature = "rand-std")]
                     let signature = secp.sign_schnorr(&msg, &key_pair);
                     #[cfg(not(feature = "rand-std"))]
-                    let signature = secp.sign_schnorr_no_aux_rand(&msg, &key_pair);
+                    let signature = secp.sign_schnorr_no_aux_rand(&msg[..], &key_pair);
 
                     let signature = taproot::Signature { signature, sighash_type };
                     input.tap_key_sig = Some(signature);
@@ -473,7 +478,7 @@ impl Psbt {
                         #[cfg(feature = "rand-std")]
                         let signature = secp.sign_schnorr(&msg, &key_pair);
                         #[cfg(not(feature = "rand-std"))]
-                        let signature = secp.sign_schnorr_no_aux_rand(&msg, &key_pair);
+                        let signature = secp.sign_schnorr_no_aux_rand(&msg[..], &key_pair);
 
                         let signature = taproot::Signature { signature, sighash_type };
                         input.tap_script_sigs.insert((xonly, lh), signature);
@@ -865,8 +870,9 @@ impl fmt::Display for GetKeyError {
 
         match *self {
             Bip32(ref e) => write_err!(f, "a bip23 error"; e),
-            NotSupported =>
-                f.write_str("the GetKey operation is not supported for this key request"),
+            NotSupported => {
+                f.write_str("the GetKey operation is not supported for this key request")
+            }
         }
     }
 }
@@ -884,7 +890,9 @@ impl std::error::Error for GetKeyError {
 }
 
 impl From<bip32::Error> for GetKeyError {
-    fn from(e: bip32::Error) -> Self { GetKeyError::Bip32(e) }
+    fn from(e: bip32::Error) -> Self {
+        GetKeyError::Bip32(e)
+    }
 }
 
 /// The various output types supported by the Bitcoin network.
@@ -991,8 +999,9 @@ impl fmt::Display for SignError {
             TaprootError(ref e) => write_err!(f, "Taproot sighash"; e),
             UnknownOutputType => write!(f, "unable to determine the output type"),
             KeyNotFound => write!(f, "unable to find key"),
-            WrongSigningAlgorithm =>
-                write!(f, "attempt to sign an input with the wrong signing algorithm"),
+            WrongSigningAlgorithm => {
+                write!(f, "attempt to sign an input with the wrong signing algorithm")
+            }
             Unsupported => write!(f, "signing request currently unsupported"),
         }
     }
@@ -1025,15 +1034,21 @@ impl std::error::Error for SignError {
 }
 
 impl From<sighash::P2wpkhError> for SignError {
-    fn from(e: sighash::P2wpkhError) -> Self { Self::P2wpkhSighash(e) }
+    fn from(e: sighash::P2wpkhError) -> Self {
+        Self::P2wpkhSighash(e)
+    }
 }
 
 impl From<IndexOutOfBoundsError> for SignError {
-    fn from(e: IndexOutOfBoundsError) -> Self { SignError::IndexOutOfBounds(e) }
+    fn from(e: IndexOutOfBoundsError) -> Self {
+        SignError::IndexOutOfBounds(e)
+    }
 }
 
 impl From<sighash::TaprootError> for SignError {
-    fn from(e: sighash::TaprootError) -> Self { SignError::TaprootError(e) }
+    fn from(e: sighash::TaprootError) -> Self {
+        SignError::TaprootError(e)
+    }
 }
 
 /// This error is returned when extracting a [`Transaction`] from a [`Psbt`].
@@ -1066,8 +1081,9 @@ impl fmt::Display for ExtractTxError {
         use ExtractTxError::*;
 
         match *self {
-            AbsurdFeeRate { fee_rate, .. } =>
-                write!(f, "an absurdly high fee rate of {}", fee_rate),
+            AbsurdFeeRate { fee_rate, .. } => {
+                write!(f, "an absurdly high fee rate of {}", fee_rate)
+            }
             MissingInputValue { .. } => write!(
                 f,
                 "one of the inputs lacked value information (witness_utxo or non_witness_utxo)"
