@@ -14,7 +14,7 @@ rust-version = "1.63.0"
 exclude = ["tests", "contrib"]
 
 [features]
-default = ["std", "hex"]
+default = ["std"]
 std = ["alloc", "bitcoin-io?/std", "hex/std"]
 alloc = ["bitcoin-io?/alloc", "hex/alloc"]
 serde = ["dep:serde", "hex"]
@@ -23,10 +23,10 @@ small-hash = []
 hex = ["dep:hex"]
 
 [dependencies]
-
-hex = { package = "hex-conservative", version = "0.3.0", default-features = false, optional = true }
 bitcoin-io = { version = "0.2.0", default-features = false, optional = true }
+
 serde = { version = "1.0", default-features = false, optional = true }
+hex = { package = "hex-conservative", version = "0.3.0", default-features = false, optional = true }
 
 [dev-dependencies]
 serde_test = "1.0"

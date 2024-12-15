@@ -1,4 +1,5 @@
 //! Contains extensions of `serde` and internal reexports.
+use hex::DisplayHex;
 
 #[doc(hidden)]
 pub use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
@@ -318,8 +319,6 @@ impl serde::Serialize for SerializeBytesAsHex<'_> {
     where
         S: serde::Serializer,
     {
-        use hex::DisplayHex;
-
         serializer.collect_str(&format_args!("{:x}", self.0.as_hex()))
     }
 }
